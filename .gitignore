@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+local.props
+dist/
+.vs/
+.idea/
+*.user
+*.log
+*.dll
+*.exe
+*.pdb
+.env
+.env.*
