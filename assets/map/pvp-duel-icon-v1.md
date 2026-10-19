@@ -1,0 +1,9 @@
+# PvP 地图图标 v1
+
+素材：pvp-duel-icon-v1.png。使用内置 image_gen 工具生成，透明背景。原版地图 Boss 图标仅用于本地风格参考，不随本素材分发。
+
+设计：两剑交锋，火焰映照在后。粗手绘轮廓、少量色块和明确剪影，适合地图 Boss 节点。从 0.2.7 起已嵌入 DLL 并接入 PvP 地图决斗节点；不改变普通爬塔 Boss 图标。
+
+## 最终生成提示词
+
+Use case: stylized-concept. Asset type: transparent PNG map boss-node icon for a Slay the Spire 2 PvP mod. The provided local image is STYLE REFERENCE ONLY: study its compact roughly drawn game-map emblem, thin irregular contours, angular organic shapes, flat ink and negative space. Generate a NEW original symbol, do not reproduce the creature or eye. Primary request: two clearly recognizable medieval swords crossing and clashing in an X, with a compact crown of rising fire BEHIND them, illuminating the duel. Sword tips point upper-left and upper-right; two simple guards and wrapped handles below, the blades overlap unambiguously at the center. Flame tongues rise behind and above the crossing, with only a tiny restrained impact spark at the crossing. Match the native map boss illustration's hand-drawn ink / woodcut character, irregular slightly distressed contours and flat graphic shapes, few large readable shapes. Primarily deep charcoal-black ink with pale parchment/ivory negative-space blade highlights; flames have muted ochre and rusty ember accents, tightly contained, retaining the same drawn style. Avoid glossy steel, photorealism, 3D rendering, neon glow, elaborate filigree or busy tiny details. Composition: one centered compact almost-square standalone emblem, strong silhouette readable at around 128 pixels, entire swords and flame tips within frame, generous transparent margin around all sides. Background: genuinely fully transparent outside the emblem, no parchment rectangle, no checkerboard baked into pixels, no scenery, no title/text/letters, no badge frame or ring. The fire is a drawn symbol behind the swords, not a full-screen fire scene.
