@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <Version>0.2.31</Version>
+    <BaseLibPath Condition="'$(BaseLibPath)' == ''">$(GameDir)\..\..\workshop\content\2868840\3737335127\BaseLib\BaseLib.dll</BaseLibPath>
+    <GameDir Condition="'$(GameDir)' == ''">$(MSBuildProgramFiles32)\Steam\steamapps\common\Slay the Spire 2</GameDir>
+    <GameData>$(GameDir)\data_sts2_windows_x86_64</GameData>
+  </PropertyGroup>
+  <Import Project="../local.props" Condition="Exists('../local.props')" />
+  <ItemGroup>
+    <EmbeddedResource Include="../docs/pvp-event-whitelist-review.md" LogicalName="SpirePvp.EventWhitelist.md" />
+    <EmbeddedResource Include="../assets/map/pvp-duel-icon-v1.png" LogicalName="SpirePvp.Assets.Map.DuelIcon.png" />
+    <Reference Include="BaseLib"><HintPath>$(BaseLibPath)</HintPath><Private>false</Private></Reference>
+    <Reference Include="sts2"><HintPath>$(GameDir)\data_sts2_windows_x86_64\sts2.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="GodotSharp"><HintPath>$(GameDir)\data_sts2_windows_x86_64\GodotSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(GameDir)\data_sts2_windows_x86_64\0Harmony.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Steamworks.NET"><HintPath>$(GameDir)\data_sts2_windows_x86_64\Steamworks.NET.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <Target Name="CheckGame" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GameDir)\data_sts2_windows_x86_64\sts2.dll')" Text="找不到 sts2.dll。请用 -p:GameDir=游戏安装目录 指定《杀戮尖塔 2》位置。" />
+  </Target>
+</Project>

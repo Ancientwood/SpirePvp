@@ -1,0 +1,12 @@
+{
+  "id": "SpirePvp",
+  "name": "Spire PvP / 尖塔决斗",
+  "author": "SpirePvp",
+  "description": "双人 PvP：选牌或现开套牌；可选各自独立发育 12 层，最后会合决斗。五种倍率及壁垒可调，局内 PvP 暂未开放。",
+  "version": "0.2.31",
+  "has_pck": false,
+  "has_dll": true,
+  "affects_gameplay": true,
+  "min_game_version": "0.111.0",
+  "dependencies": [{ "id": "BaseLib", "min_version": "3.4.7" }]
+}
