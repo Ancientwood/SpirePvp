@@ -13,13 +13,14 @@ internal static class LanHostBinding
     [ThreadStatic] private static bool _starting;
     [ThreadStatic] private static NetErrorInfo? _error;
 
-    internal static NetErrorInfo? StartHost(NetHostGameService service, ushort port)
+    internal static NetErrorInfo? StartHost(NetHostGameService service, ushort port, int maxPlayers = 2)
     {
+        if (maxPlayers is < 2 or > 4) throw new ArgumentOutOfRangeException(nameof(maxPlayers));
         _starting = true;
         _error = null;
         try
         {
-            service.StartENetHost(port, 2);
+            service.StartENetHost(port, maxPlayers);
             return _error;
         }
         finally

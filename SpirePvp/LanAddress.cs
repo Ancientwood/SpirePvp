@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net;
+using System.Security.Cryptography;
 
 namespace SpirePvp;
 
@@ -7,6 +8,12 @@ public static class LanAddress
 {
     public const ushort DefaultPort = 33771;
     public const ulong ClientId = 1000;
+
+    public static ulong CreateNativeClientId()
+    {
+        return (BitConverter.ToUInt64(RandomNumberGenerator.GetBytes(sizeof(ulong))) & 0x3FFF_FFFF_FFFF_FFFFUL)
+            | 0x4000_0000_0000_0000UL;
+    }
 
     public static bool TryParsePort(string? text, out ushort port)
     {

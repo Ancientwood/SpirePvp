@@ -40,7 +40,7 @@ internal static class HostMenuPatch
 
     internal static async Task StartHost(NSubmenu menu, Button button, ushort? lanPort = null)
     {
-        if (PvpSession.HostingPvp) return;
+        if (PvpSession.HostingPvp || NativeLanHost.Hosting) return;
         button.Disabled = true;
         PvpSession.HostingPvp = true;
         var overlay = (Control)AccessTools.Field(menu.GetType(), "_loadingOverlay").GetValue(menu)!;
@@ -103,13 +103,24 @@ internal static class LanMenuPatch
     static void Postfix(NMultiplayerSubmenu __instance)
     {
         if (__instance.HasNode("SpirePvpLanButtons")) return;
-        var row = new HBoxContainer
+        var row = new GridContainer
         {
-            Name = "SpirePvpLanButtons",
+            Name = "SpirePvpLanButtons", Columns = 2,
             AnchorLeft = .5f, AnchorRight = .5f, AnchorTop = 1, AnchorBottom = 1,
-            OffsetLeft = -290, OffsetRight = 290, OffsetTop = -100, OffsetBottom = -36
+            OffsetLeft = -290, OffsetRight = 290, OffsetTop = -176, OffsetBottom = -36
         };
-        row.AddThemeConstantOverride("separation", 12);
+        row.AddThemeConstantOverride("h_separation", 12);
+        row.AddThemeConstantOverride("v_separation", 12);
+        var nativeHost = new Button
+        {
+            Name = "NativeHost", Text = "原版 · LAN 建房", CustomMinimumSize = new Vector2(280, 64),
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+        var nativeJoin = new Button
+        {
+            Name = "NativeJoin", Text = "原版 · LAN 加入", CustomMinimumSize = new Vector2(280, 64),
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
         var host = new Button
         {
             Text = "PvP · LAN 建房", CustomMinimumSize = new Vector2(280, 64),
@@ -122,11 +133,23 @@ internal static class LanMenuPatch
         };
         host.AddThemeFontSizeOverride("font_size", 26);
         join.AddThemeFontSizeOverride("font_size", 26);
+        nativeHost.AddThemeFontSizeOverride("font_size", 26);
+        nativeJoin.AddThemeFontSizeOverride("font_size", 26);
+        row.AddChild(nativeHost);
+        row.AddChild(nativeJoin);
         row.AddChild(host);
         row.AddChild(join);
         __instance.AddChild(row);
+        nativeHost.Pressed += () => LanMenu.ShowHost(__instance, nativeHost, native: true);
+        nativeJoin.Pressed += () => LanMenu.ShowJoin(__instance, nativeJoin, native: true);
         host.Pressed += () => LanMenu.ShowHost(__instance, host);
         join.Pressed += () => LanMenu.ShowJoin(__instance, join);
+        nativeHost.FocusNeighborRight = nativeJoin.GetPath();
+        nativeJoin.FocusNeighborLeft = nativeHost.GetPath();
+        nativeHost.FocusNeighborBottom = host.GetPath();
+        nativeJoin.FocusNeighborBottom = join.GetPath();
+        host.FocusNeighborTop = nativeHost.GetPath();
+        join.FocusNeighborTop = nativeJoin.GetPath();
         host.FocusNeighborRight = join.GetPath();
         join.FocusNeighborLeft = host.GetPath();
     }
@@ -135,11 +158,26 @@ internal static class LanMenuPatch
 internal static class LanMenu
 {
     private const string DialogName = "SpirePvpLanDialog";
+    private static readonly ulong NativeClientId = LanAddress.CreateNativeClientId();
 
-    internal static void ShowHost(NSubmenu menu, Button button)
+    internal static void ShowHost(NSubmenu menu, Button button, bool native = false)
     {
-        if (menu.HasNode(DialogName) || PvpSession.HostingPvp) return;
-        var dialog = CreateDialog(menu, "PvP · LAN 建房", "创建房间", out var fields);
+        if (menu.HasNode(DialogName) || PvpSession.HostingPvp || NativeLanHost.Hosting) return;
+        var dialog = CreateDialog(menu, native ? "原版 · LAN 建房" : "PvP · LAN 建房", "创建房间", out var fields);
+        OptionButton? mode = null;
+        if (native)
+        {
+            fields.AddChild(new Label { Text = "游戏模式（最多 4 人）" });
+            mode = new OptionButton { CustomMinimumSize = new Vector2(0, 48) };
+            mode.AddItem("普通爬塔", (int)GameMode.Standard);
+            bool dailyUnlocked = NativeLanHost.IsUnlocked(GameMode.Daily);
+            bool customUnlocked = NativeLanHost.IsUnlocked(GameMode.Custom);
+            mode.AddItem(dailyUnlocked ? "每日挑战" : "每日挑战（未解锁）", (int)GameMode.Daily);
+            mode.AddItem(customUnlocked ? "自定义" : "自定义（未解锁）", (int)GameMode.Custom);
+            mode.SetItemDisabled(1, !dailyUnlocked);
+            mode.SetItemDisabled(2, !customUnlocked);
+            fields.AddChild(mode);
+        }
         fields.AddChild(new Label { Text = "本机 IPv4" });
         fields.AddChild(new TextEdit
         {
@@ -164,21 +202,23 @@ internal static class LanMenu
                 return;
             }
             submitted = true;
+            var selectedMode = mode == null ? GameMode.Standard : (GameMode)mode.GetSelectedId();
             PvpSettings.RememberLan(null, port);
             dialog.Hide();
             dialog.QueueFree();
-            TaskHelper.RunSafely(HostMenuPatch.StartHost(menu, button, port));
+            if (native) NativeLanHost.StartHost(menu, button, port, selectedMode);
+            else TaskHelper.RunSafely(HostMenuPatch.StartHost(menu, button, port));
         }
         dialog.Confirmed += Submit;
         portInput.TextSubmitted += _ => Submit();
-        dialog.PopupCentered(new Vector2I(640, 360));
+        dialog.PopupCentered(new Vector2I(640, native ? 460 : 360));
         portInput.GrabFocus();
     }
 
-    internal static void ShowJoin(NSubmenu menu, Button button)
+    internal static void ShowJoin(NSubmenu menu, Button button, bool native = false)
     {
-        if (menu.HasNode(DialogName)) return;
-        var dialog = CreateDialog(menu, "PvP · LAN 加入", "连接", out var fields);
+        if (menu.HasNode(DialogName) || PvpSession.HostingPvp || NativeLanHost.Hosting) return;
+        var dialog = CreateDialog(menu, native ? "原版 · LAN 加入" : "PvP · LAN 加入", "连接", out var fields);
         fields.AddChild(new Label { Text = "房主 IPv4 / IPv4:端口" });
         var addressInput = new LineEdit
         {
@@ -201,7 +241,7 @@ internal static class LanMenu
             PvpSettings.RememberLan($"{address}:{port}", null);
             dialog.Hide();
             dialog.QueueFree();
-            TaskHelper.RunSafely(Join(menu, button, address, port));
+            TaskHelper.RunSafely(Join(menu, button, address, port, native ? NativeClientId : LanAddress.ClientId));
         }
         dialog.Confirmed += Submit;
         addressInput.TextSubmitted += _ => Submit();
@@ -243,7 +283,7 @@ internal static class LanMenu
         }
     }
 
-    private static async Task Join(NSubmenu menu, Button button, string address, ushort port)
+    private static async Task Join(NSubmenu menu, Button button, string address, ushort port, ulong clientId)
     {
         button.Disabled = true;
         try
@@ -251,7 +291,7 @@ internal static class LanMenu
             var stack = (NSubmenuStack)AccessTools.Field(typeof(NSubmenu), "_stack").GetValue(menu)!;
             var screen = stack.GetSubmenuType<NJoinFriendScreen>();
             stack.Push(screen);
-            await screen.JoinGameAsync(new ENetClientConnectionInitializer(LanAddress.ClientId, address, port));
+            await screen.JoinGameAsync(new ENetClientConnectionInitializer(clientId, address, port));
         }
         catch
         {

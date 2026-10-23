@@ -19,6 +19,16 @@ internal static class LanConnectionTests
             "Existing settings files retain their PvP options and get LAN defaults");
 
         var patch = typeof(ModEntry).Assembly.GetType("SpirePvp.LanHostBinding", throwOnError: true)!;
+        var startHost = HarmonyLib.AccessTools.Method(patch, "StartHost");
+        check(Equals(startHost.GetParameters()[2].DefaultValue, 2), "Existing PvP LAN hosts keep a two-player default");
+        foreach (int invalidCapacity in new[] { 0, 1, 5 })
+        {
+            bool rejected = false;
+            try { startHost.Invoke(null, [null, LanAddress.DefaultPort, invalidCapacity]); }
+            catch (System.Reflection.TargetInvocationException exception) when (exception.InnerException is ArgumentOutOfRangeException)
+            { rejected = true; }
+            check(rejected, $"Reject invalid native LAN capacity: {invalidCapacity}");
+        }
         var resolve = HarmonyLib.AccessTools.Method(patch, "ResolveBindAddress");
         var starting = HarmonyLib.AccessTools.Field(patch, "_starting");
         check((string)resolve.Invoke(null, ["127.0.0.1"])! == "127.0.0.1",
@@ -45,6 +55,61 @@ internal static class LanConnectionTests
         var menu = HarmonyLib.AccessTools.Method(typeof(MegaCrit.Sts2.Core.Nodes.Screens.MainMenu.NMultiplayerSubmenu), "_Ready");
         check(HarmonyLib.Harmony.GetPatchInfo(menu)?.Postfixes.Any(info => info.owner == "spirepvp.duel") == true,
             "LAN menu patch is registered independently of Steam host/join buttons");
+
+        var nativeHost = typeof(ModEntry).Assembly.GetType("SpirePvp.NativeLanHost", throwOnError: true)!;
+        check(Equals(HarmonyLib.AccessTools.Field(nativeHost, "MaxPlayers").GetRawConstantValue(), 4),
+            "Native LAN rooms retain the original four-player capacity");
+        var unlocked = HarmonyLib.AccessTools.Method(nativeHost, "IsUnlocked");
+        check((bool)unlocked.Invoke(null, [MegaCrit.Sts2.Core.Runs.GameMode.Standard])!,
+            "Standard LAN hosting requires no daily/custom unlock");
+        check(!(bool)unlocked.Invoke(null, [(MegaCrit.Sts2.Core.Runs.GameMode)999])!,
+            "Unsupported native LAN modes cannot be selected");
+        var unlockCalls = HarmonyLib.PatchProcessor.GetOriginalInstructions(unlocked)
+            .Select(instruction => instruction.operand).OfType<System.Reflection.MethodInfo>()
+            .Where(method => method.IsGenericMethod).SelectMany(method => method.GetGenericArguments()).ToArray();
+        check(unlockCalls.Contains(typeof(MegaCrit.Sts2.Core.Timeline.Epochs.DailyRunEpoch))
+            && unlockCalls.Contains(typeof(MegaCrit.Sts2.Core.Timeline.Epochs.CustomAndSeedsEpoch)),
+            "Native LAN keeps the game's daily and custom unlock checks");
+        var initializeLobby = HarmonyLib.AccessTools.Method(nativeHost, "InitializeLobby");
+        var lobbyCalls = HarmonyLib.PatchProcessor.GetOriginalInstructions(initializeLobby)
+            .Select(instruction => instruction.operand).OfType<System.Reflection.MethodInfo>().ToArray();
+        foreach (var screenType in new[]
+        {
+            typeof(MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect.NCharacterSelectScreen),
+            typeof(MegaCrit.Sts2.Core.Nodes.Screens.DailyRun.NDailyRunScreen),
+            typeof(MegaCrit.Sts2.Core.Nodes.Screens.CustomRun.NCustomRunScreen)
+        })
+            check(lobbyCalls.Any(method => method.DeclaringType == screenType && method.Name == "InitializeMultiplayerAsHost"),
+                $"Native LAN initializes original lobby: {screenType.Name}");
+        check(lobbyCalls.All(method => method.DeclaringType != typeof(PvpLobbyModifiers)
+            && method.DeclaringType?.Name != "PvpUi" && method.Name != "SetModifiers" && method.Name != "SyncAscensionChange"),
+            "Native LAN does not inject PvP modifiers, UI or forced ascension");
+        bool invalidModeRejected = false;
+        try { initializeLobby.Invoke(null, [null, null, (MegaCrit.Sts2.Core.Runs.GameMode)999]); }
+        catch (System.Reflection.TargetInvocationException exception) when (exception.InnerException is ArgumentOutOfRangeException)
+        { invalidModeRejected = true; }
+        check(invalidModeRejected, "Invalid LAN modes are rejected before opening a lobby");
+
+        var lobby = (MegaCrit.Sts2.Core.Multiplayer.Game.Lobby.StartRunLobby)System.Runtime.CompilerServices.RuntimeHelpers
+            .GetUninitializedObject(typeof(MegaCrit.Sts2.Core.Multiplayer.Game.Lobby.StartRunLobby));
+        var modifiers = new List<MegaCrit.Sts2.Core.Models.ModifierModel>();
+        var players = new List<MegaCrit.Sts2.Core.Entities.Multiplayer.StartRunLobbyPlayer>();
+        HarmonyLib.AccessTools.Field(lobby.GetType(), "_modifiers").SetValue(lobby, modifiers);
+        HarmonyLib.AccessTools.Field(lobby.GetType(), "<Players>k__BackingField").SetValue(lobby, players);
+        var gate = HarmonyLib.AccessTools.Method(typeof(ModEntry).Assembly.GetType("SpirePvp.TwoPlayersPatch"), "Postfix");
+        foreach (int count in new[] { 2, 3, 4 })
+        {
+            players.Clear();
+            players.AddRange(Enumerable.Range(0, count).Select(_ => default(MegaCrit.Sts2.Core.Entities.Multiplayer.StartRunLobbyPlayer)));
+            modifiers.Clear();
+            object?[] nativeArguments = [lobby, true];
+            gate.Invoke(null, nativeArguments);
+            check((bool)nativeArguments[1]!, $"Native LAN accepts {count} ready players without the PvP gate");
+            modifiers.Add((PvpDuel)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(PvpDuel)));
+            object?[] pvpArguments = [lobby, true];
+            gate.Invoke(null, pvpArguments);
+            check((bool)pvpArguments[1]! == (count == 2), $"PvP keeps the two-player rule with {count} players");
+        }
     }
 #endif
 
@@ -76,6 +141,10 @@ internal static class LanConnectionTests
         foreach (string? input in new string?[] { null, "", "0", "65536", "-1", "+1", "1.0", "abc" })
             check(!LanAddress.TryParsePort(input, out _), $"Reject invalid host port: {input ?? "null"}");
         check(LanAddress.ClientId == 1000, "Two-player LAN uses the native client ID, distinct from host ID 1");
+        var nativeIds = Enumerable.Range(0, 128).Select(_ => LanAddress.CreateNativeClientId()).ToArray();
+        check(nativeIds.Distinct().Count() == nativeIds.Length, "Native LAN clients generate independent identities");
+        check(nativeIds.All(id => id >= 0x4000_0000_0000_0000UL && id <= long.MaxValue),
+            "Native LAN IDs avoid host and reserved test-client identities");
     }
 
 #if LAN_ONLY
