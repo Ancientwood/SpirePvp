@@ -1,10 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net9.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
-  <ItemGroup><ProjectReference Include="../SpirePvp/SpirePvp.csproj" /></ItemGroup>
+  <PropertyGroup Condition="'$(LanOnly)' == 'true'"><DefineConstants>$(DefineConstants);LAN_ONLY</DefineConstants></PropertyGroup>
+  <ItemGroup Condition="'$(LanOnly)' == 'true'">
+    <Compile Remove="Program.cs;CharacterModFixtures.cs;MintyDisplayFixture.cs" />
+    <Compile Include="../SpirePvp/LanAddress.cs" Link="LanAddress.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(LanOnly)' != 'true'"><ProjectReference Include="../SpirePvp/SpirePvp.csproj" /></ItemGroup>
   <PropertyGroup><GameDir Condition="'$(GameDir)' == ''">$(MSBuildProgramFiles32)\Steam\steamapps\common\Slay the Spire 2</GameDir></PropertyGroup>
   <PropertyGroup><BaseLibPath Condition="'$(BaseLibPath)' == ''">$(GameDir)\..\..\workshop\content\2868840\3737335127\BaseLib\BaseLib.dll</BaseLibPath></PropertyGroup>
   <Import Project="../local.props" Condition="Exists('../local.props')" />
-  <ItemGroup>
+  <ItemGroup Condition="'$(LanOnly)' != 'true'">
     <Reference Include="BaseLib"><HintPath>$(BaseLibPath)</HintPath><Private>true</Private></Reference>
     <Reference Include="sts2"><HintPath>$(GameDir)/data_sts2_windows_x86_64/sts2.dll</HintPath><Private>true</Private></Reference>
     <Reference Include="GodotSharp"><HintPath>$(GameDir)/data_sts2_windows_x86_64/GodotSharp.dll</HintPath><Private>true</Private></Reference>

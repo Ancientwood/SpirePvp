@@ -32,6 +32,7 @@ void RunTests()
         Console.WriteLine("PASS " + description);
         passed++;
     }
+    LanConnectionTests.Run(Check);
     Check(DuelRules.Outcome(true, true) == DuelOutcome.InProgress, "两人存活时不会因空敌人侧自动胜利");
     Check(DuelRules.Outcome(true, false) == DuelOutcome.FirstWins, "对手死亡判定胜利");
     Check(DuelRules.Outcome(false, true) == DuelOutcome.SecondWins, "本方死亡判定失败");
@@ -72,6 +73,7 @@ void RunTests()
     MegaCrit.Sts2.Core.Logging.Logger.logLevelTypeMap[MegaCrit.Sts2.Core.Logging.LogType.Generic] = MegaCrit.Sts2.Core.Logging.LogLevel.Error;
     var harmony = new Harmony("spirepvp.duel");
     ModEntry.Initialize();
+    LanConnectionTests.RunGameChecks(Check);
     using (var icon = typeof(ModEntry).Assembly.GetManifestResourceStream("SpirePvp.Assets.Map.DuelIcon.png"))
     {
         var header = new byte[26];

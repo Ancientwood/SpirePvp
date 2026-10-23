@@ -16,6 +16,9 @@ public sealed class PvpSettings
     public bool CardLimitEnabled { get; set; }
     public bool DeferredDamage { get; set; }
     public bool SameSeed { get; set; }
+    public string LastLanAddress { get; set; } = string.Empty;
+    private int _lanPort = LanAddress.DefaultPort;
+    public int LanPort { get => _lanPort; set => _lanPort = value is >= 1 and <= 65535 ? value : LanAddress.DefaultPort; }
     private int _maxCardsPerTurn = 15;
     public int MaxCardsPerTurn { get => _maxCardsPerTurn; set => _maxCardsPerTurn = value is >= 1 and <= 100 ? value : 15; }
     private decimal _healthMultiplier = 2m;
@@ -69,6 +72,15 @@ public sealed class PvpSettings
         try { Current.Save(SettingsPath); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         { Log.Error("[SpirePvp] 战前发育设置保存失败：" + e.Message); }
+    }
+
+    internal static void RememberLan(string? address, ushort? port)
+    {
+        if (address != null) Current.LastLanAddress = address;
+        if (port.HasValue) Current.LanPort = port.Value;
+        try { Current.Save(SettingsPath); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        { Log.Error("[SpirePvp] LAN 设置保存失败：" + e.Message); }
     }
 
     public static PvpSettings Load(string path)
