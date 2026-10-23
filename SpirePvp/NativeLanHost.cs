@@ -4,6 +4,7 @@ using MegaCrit.Sts2.Core.Entities.Multiplayer;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Multiplayer;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
+using MegaCrit.Sts2.Core.Nodes.Multiplayer;
 using MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect;
 using MegaCrit.Sts2.Core.Nodes.Screens.CustomRun;
 using MegaCrit.Sts2.Core.Nodes.Screens.DailyRun;
@@ -16,7 +17,7 @@ namespace SpirePvp;
 
 internal static class NativeLanHost
 {
-    internal const int MaxPlayers = 4;
+    internal const int MaxPlayers = 2;
     internal static bool Hosting { get; private set; }
 
     internal static bool IsUnlocked(GameMode mode) => mode switch
@@ -27,17 +28,19 @@ internal static class NativeLanHost
         _ => false
     };
 
-    internal static void StartHost(NSubmenu menu, Button button, ushort port, GameMode mode)
+    internal static void StartHost(NSubmenu menu, Control button, ushort port, GameMode mode, SerializableRun? savedRun = null)
     {
         if (Hosting || PvpSession.HostingPvp) return;
         Hosting = true;
-        button.Disabled = true;
+        LanMenu.SetEnabled(button, false);
         Control? overlay = null;
         NetHostGameService? service = null;
         bool handedOff = false;
         try
         {
-            if (!IsUnlocked(mode)) throw new InvalidOperationException("LAN game mode is locked or unsupported.");
+            if (savedRun == null && !IsUnlocked(mode)) throw new InvalidOperationException("LAN game mode is locked or unsupported.");
+            if (savedRun != null && !LanRunSaves.IsCompatible(savedRun, native: true))
+                throw new InvalidOperationException("The save is not a two-player A1/A2 native LAN run.");
             overlay = (Control)AccessTools.Field(menu.GetType(), "_loadingOverlay").GetValue(menu)!;
             var stack = (NSubmenuStack)AccessTools.Field(typeof(NSubmenu), "_stack").GetValue(menu)!;
             overlay.Visible = true;
@@ -48,7 +51,8 @@ internal static class NativeLanHost
                 ShowError(error.Value);
                 return;
             }
-            stack.Push(InitializeLobby(stack, service, mode));
+            LanRunSaves.Activate(native: true);
+            stack.Push(savedRun == null ? InitializeLobby(stack, service, mode) : InitializeLoadLobby(stack, service, savedRun));
             handedOff = true;
         }
         catch (Exception exception)
@@ -60,7 +64,8 @@ internal static class NativeLanHost
         {
             Hosting = false;
             if (GodotObject.IsInstanceValid(overlay)) overlay!.Visible = false;
-            if (GodotObject.IsInstanceValid(button)) button.Disabled = false;
+            if (GodotObject.IsInstanceValid(button)) LanMenu.SetEnabled(button, true);
+            if (!handedOff) LanRunSaves.ClearActive();
             if (!handedOff && service != null) service.Disconnect(NetError.Quit, true);
         }
     }
@@ -90,5 +95,26 @@ internal static class NativeLanHost
     {
         var popup = NErrorPopup.Create(error);
         if (popup != null) NModalContainer.Instance?.Add(popup);
+    }
+
+    internal static NSubmenu InitializeLoadLobby(NSubmenuStack stack, NetHostGameService service, SerializableRun run)
+    {
+        switch (run.GameMode)
+        {
+            case GameMode.Standard:
+                var standard = stack.GetSubmenuType<NMultiplayerLoadGameScreen>();
+                standard.InitializeAsHost(service, run);
+                return standard;
+            case GameMode.Daily:
+                var daily = stack.GetSubmenuType<NDailyRunLoadScreen>();
+                daily.InitializeAsHost(service, run);
+                return daily;
+            case GameMode.Custom:
+                var custom = stack.GetSubmenuType<NCustomRunLoadScreen>();
+                custom.InitializeAsHost(service, run);
+                return custom;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(run.GameMode));
+        }
     }
 }

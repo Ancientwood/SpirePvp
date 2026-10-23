@@ -110,6 +110,7 @@ void RunTests()
         [typeof(ExampleCharacterMod.ExampleCard)] = (null, true)
     };
     MegaCrit.Sts2.Core.Multiplayer.Serialization.ModelIdSerializationCache.Init();
+    LanConnectionTests.RunSaveChecks(Check);
     foreach (bool sealedDeck in new[] { false, true })
     {
         var modifiers = PvpLobbyModifiers.Create(sealedDeck);

@@ -4,7 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
-    <Version>0.2.32</Version>
+    <Version>0.3.0</Version>
     <BaseLibPath Condition="'$(BaseLibPath)' == ''">$(GameDir)\..\..\workshop\content\2868840\3737335127\BaseLib\BaseLib.dll</BaseLibPath>
     <GameDir Condition="'$(GameDir)' == ''">$(MSBuildProgramFiles32)\Steam\steamapps\common\Slay the Spire 2</GameDir>
     <GameData>$(GameDir)\data_sts2_windows_x86_64</GameData>
